@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from numbers import Real
-from typing import Any, Optional
+from typing import Any, Optional, Pattern, Union
 
 from validation_pipeline.handler import Handler
 from validation_pipeline.result import ValidationResult
@@ -82,5 +83,65 @@ class RangeHandler(Handler):
                 self.name,
                 f"field '{self.field}' = {value} not in "
                 f"[{self.minimum}, {self.maximum}]",
+            )
+        return self._forward(payload)
+
+
+class MinLengthHandler(Handler):
+    def __init__(self, field: str, minimum: int) -> None:
+        super().__init__()
+        if not field:
+            raise ValueError("field name must be a non-empty string")
+        if minimum < 0:
+            raise ValueError("minimum length cannot be negative")
+        self.field = field
+        self.minimum = minimum
+
+    @property
+    def name(self) -> str:
+        return f"min_length[{self.field}:{self.minimum}]"
+
+    def handle(self, payload: Any) -> Optional[ValidationResult]:
+        if not isinstance(payload, Mapping) or self.field not in payload:
+            return self._forward(payload)
+        value = payload[self.field]
+        if not isinstance(value, str):
+            return self._forward(payload)
+        if len(value) < self.minimum:
+            return ValidationResult.failure(
+                self.name,
+                f"field '{self.field}' length {len(value)} is below minimum {self.minimum}",
+            )
+        return self._forward(payload)
+
+
+class PatternHandler(Handler):
+    def __init__(
+        self,
+        field: str,
+        pattern: Union[str, Pattern[str]],
+        label: Optional[str] = None,
+    ) -> None:
+        super().__init__()
+        if not field:
+            raise ValueError("field name must be a non-empty string")
+        self.field = field
+        self.pattern = re.compile(pattern) if isinstance(pattern, str) else pattern
+        self.label = label or "pattern"
+
+    @property
+    def name(self) -> str:
+        return f"pattern[{self.field}:{self.label}]"
+
+    def handle(self, payload: Any) -> Optional[ValidationResult]:
+        if not isinstance(payload, Mapping) or self.field not in payload:
+            return self._forward(payload)
+        value = payload[self.field]
+        if not isinstance(value, str):
+            return self._forward(payload)
+        if self.pattern.fullmatch(value) is None:
+            return ValidationResult.failure(
+                self.name,
+                f"field '{self.field}' does not match {self.label}",
             )
         return self._forward(payload)

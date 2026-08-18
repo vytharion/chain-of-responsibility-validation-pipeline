@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Pattern, Union
 
 from validation_pipeline.execution import ExecutionMode
 from validation_pipeline.handler import Handler
 from validation_pipeline.result import ValidationResult
-from validation_pipeline.validators import PresenceHandler, RangeHandler, TypeHandler
+from validation_pipeline.validators import (
+    MinLengthHandler,
+    PatternHandler,
+    PresenceHandler,
+    RangeHandler,
+    TypeHandler,
+)
 
 
 class ChainBuilder:
@@ -28,6 +34,17 @@ class ChainBuilder:
 
     def range_of(self, field: str, minimum: float, maximum: float) -> "ChainBuilder":
         return self.add(RangeHandler(field, minimum, maximum))
+
+    def min_length(self, field: str, minimum: int) -> "ChainBuilder":
+        return self.add(MinLengthHandler(field, minimum))
+
+    def pattern(
+        self,
+        field: str,
+        pattern: Union[str, Pattern[str]],
+        label: Optional[str] = None,
+    ) -> "ChainBuilder":
+        return self.add(PatternHandler(field, pattern, label))
 
     def __len__(self) -> int:
         return len(self._handlers)
